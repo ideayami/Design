@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Design Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#14161c;
+    --panel:#1b1e27;
+    --panel-raised:#232733;
+    --line:#2a2e3a;
+    --ink:#edeef2;
+    --ink-dim:#9096a8;
+    --signal:#8b8fff;
+    --signal-dim:#4d4f8a;
+    --amber:#ffb454;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--canvas);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--signal);color:#14161c;}
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    border-radius:2px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:14px;height:14px;border-radius:50%;
+    background:var(--signal);
+    border:2px solid #14161c;
+    cursor:pointer;
+    box-shadow:0 0 0 1px var(--signal);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;
+    background:var(--signal);border:2px solid #14161c;cursor:pointer;
+  }
+  input[type=color]{
+    -webkit-appearance:none;
+    width:30px;height:30px;border:none;border-radius:8px;
+    padding:0;background:none;cursor:pointer;
+  }
+  input[type=color]::-webkit-color-swatch-wrapper{padding:0;}
+  input[type=color]::-webkit-color-swatch{border-radius:8px;border:1px solid var(--line);}
+  select{
+    background:var(--panel-raised);
+    color:var(--ink);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:6px 8px;
+    font-family:'Inter',sans-serif;
+    font-size:12.5px;
+    outline:none;
+  }
+  button{font-family:inherit;cursor:pointer;}
+
+  #app{
+    display:grid;
+    grid-template-rows:52px 1fr;
+    height:100vh;
+    min-height:560px;
+  }
+
+  /* top bar */
+  #topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 18px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#1c1f29,#171a22);
+  }
+  #brand{
+    display:flex;align-items:center;gap:9px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:.02em;
+  }
+  #brand .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--signal);
+    box-shadow:0 0 8px 1px var(--signal);
+    animation:pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1;}
+    50%{opacity:.35;}
+  }
+  #fmt-toggle{
+    display:flex;background:var(--panel-raised);
+    border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px;
+  }
+  #fmt-toggle button{
+    border:none;background:transparent;color:var(--ink-dim);
+    font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;
+    font-family:'JetBrains Mono',monospace;
+    transition:background .15s, color .15s;
+  }
+  #fmt-toggle button.active{background:var(--signal);color:#14161c;}
+
+  /* body layout */
+  #body{
+    display:grid;
+    grid-template-columns:188px 1fr;
+    min-height:0;
+  }
+  #sidebar{
+    border-right:1px solid var(--line);
+    padding:14px 10px;
+    overflow-y:auto;
+    background:var(--panel);
+  }
+  .module-btn{
+    display:flex;align-items:center;gap:10px;
+    width:100%;text-align:left;
+    background:transparent;border:1px solid transparent;
+    color:var(--ink-dim);
+    padding:9px 10px;border-radius:8px;
+    font-size:12.5px;font-weight:500;
+    margin-bottom:3px;
+    position:relative;
+    transition:background .15s,color .15s,border-color .15s;
+  }
+  .module-btn .icon{font-size:15px;width:18px;text-align:center;filter:grayscale(1);opacity:.7;transition:filter .15s,opacity .15s;}
+  .module-btn .led{
+    position:absolute;right:8px;width:6px;height:6px;border-radius:50%;
+    background:var(--line);
+  }
+  .module-btn:hover{background:var(--panel-raised);color:var(--ink);}
+  .module-btn.active{
+    background:var(--panel-raised);
+    border-color:var(--signal-dim);
+    color:var(--ink);
+  }
+  .module-btn.active .icon{filter:none;opacity:1;}
+  .module-btn.active .led{background:var(--signal);box-shadow:0 0 6px 1px var(--signal);}
+
+  /* main area */
+  #main{
+    display:grid;
+    grid-template-rows:1fr 190px;
+    min-height:0;
+  }
+  #workzone{
+    display:grid;
+    grid-template-columns:1fr 260px;
+    min-height:0;
+    border-bottom:1px solid var(--line);
+  }
+  #stage{
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+    background:
+      radial-gradient(circle at 50% 40%, #1a1d27 0%, #14161c 70%);
+    overflow:hidden;
+  }
+  #stage::before{
+    content:"";position:absolute;inset:0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:26px 26px;
+    opacity:.25;
+    pointer-events:none;
+  }
+  #stage-label{
+    position:absolute;top:12px;left:16px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;color:var(--ink-dim);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+  #controls{
+    padding:16px 16px;
+    overflow-y:auto;
+    border-left:1px solid var(--line);
+  }
+  .field{margin-bottom:14px;}
+  .field label{
+    display:flex;justify-content:space-between;
+    font-size:11px;color:var(--ink-dim);margin-bottom:6px;
+    font-family:'JetBrains Mono',monospace;
+    letter-spacing:.02em;
+  }
+  .field label .val{color:var(--amber);}
+  .row2{display:flex;gap:8px;}
+  .row2 > div{flex:1;}
+  .seg{
+    display:flex;background:var(--panel-raised);border:1px solid var(--line);
+    border-radius:7px;padding:2px;gap:2px;
+  }
+  .seg button{
+    flex:1;border:none;background:transparent;color:var(--ink-dim);
+    font-size:11px;padding:6px 4px;border-radius:5px;font-weight:500;
+    transition:background .15s,color .15s;
+  }
+  .seg button.active{background:var(--signal);color:#14161c;}
+  .swatch-row{display:flex;align-items:center;gap:8px;}
+  .swatch-row span{font-size:11px;color:var(--ink-dim);font-family:'JetBrains Mono',monospace;}
+  .check-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+  .check-row input{width:14px;height:14px;accent-color:var(--signal);}
+  .check-row label{font-size:11px;color:var(--ink-dim);font-family:'JetBrains Mono',monospace;}
+  .section-title{
+    font-size:10px;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--signal);margin:2px 0 10px;font-weight:600;
+  }
+
+  /* output */
+  #output{
+    display:grid;grid-template-columns:1fr auto;
+    align-items:stretch;
+    background:#101218;
+  }
+  #code-wrap{
+    padding:14px 18px;overflow:auto;position:relative;
+  }
+  #code-wrap::before{
+    content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 2px, transparent 2px 4px);
+    pointer-events:none;
+  }
+  #code{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;line-height:1.65;
+    white-space:pre;color:#cfe8d8;
+    margin:0;
+  }
+  .tok-prop{color:#8b8fff;}
+  .tok-val{color:#ffb454;}
+  .tok-sel{color:#7fd8ff;}
+  .tok-punc{color:#5a5f70;}
+  #output-side{
+    width:150px;border-left:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;padding:10px;
+  }
+  #copy-btn{
+    width:100%;
+    background:var(--signal);color:#14161c;border:none;
+    padding:9px 0;border-radius:8px;font-weight:700;font-size:12px;
+    font-family:'Space Grotesk',sans-serif;
+    transition:transform .1s, opacity .2s;
+  }
+  #copy-btn:active{transform:scale(.96);}
+  #copy-btn.copied{background:var(--amber);}
+  #share-btn{
+    width:100%;
+    background:transparent;color:var(--ink);
+    border:1px solid var(--signal-dim);
+    padding:8px 0;border-radius:8px;font-weight:600;font-size:11.5px;
+    font-family:'Space Grotesk',sans-serif;
+    transition:border-color .15s, background .15s, transform .1s;
+  }
+  #share-btn:hover{border-color:var(--signal);background:rgba(139,143,255,.08);}
+  #share-btn:active{transform:scale(.96);}
+  #share-btn.copied{border-color:var(--amber);color:var(--amber);}
+  #share-hint{
+    font-size:9.5px;color:var(--ink-dim);text-align:center;
+    font-family:'JetBrains Mono',monospace;line-height:1.4;
+  }
+  #meter{
+    display:flex;gap:3px;
+  }
+  #meter span{width:4px;height:14px;border-radius:2px;background:var(--line);}
+  #meter span.on{background:var(--signal);}
+
+  /* preview elements */
+  .pv-box{width:140px;height:140px;background:linear-gradient(145deg,#8b8fff,#5a5ee0);}
+  .pv-btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:14px;
+    border:none;cursor:pointer;
+  }
+  .flex-demo{
+    width:220px;height:150px;border:1px dashed var(--signal-dim);
+    display:flex;
+  }
+  .flex-demo .chip{
+    width:34px;height:34px;border-radius:8px;
+    background:linear-gradient(145deg,#8b8fff,#5a5ee0);
+    color:#14161c;font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .glass-backdrop{
+    width:260px;height:170px;border-radius:16px;
+    background:linear-gradient(135deg,#ff8a65,#8b8fff 55%,#5eead4);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+  }
+  .transform-target{
+    width:110px;height:110px;
+    background:linear-gradient(145deg,#8b8fff,#5a5ee0);
+    border-radius:12px;
+  }
+
+  @media (max-width:760px){
+    #body{grid-template-columns:1fr;}
+    #sidebar{
+      display:flex;overflow-x:auto;border-right:none;border-bottom:1px solid var(--line);
+      padding:10px;
+    }
+    .module-btn{flex:0 0 auto;margin-bottom:0;margin-right:4px;}
+    #workzone{grid-template-columns:1fr;}
+    #controls{border-left:none;border-top:1px solid var(--line);}
+    #main{grid-template-rows:auto auto 190px;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div id="brand"><span class="dot"></span>DESIGN CONSOLE</div>
+    <div id="fmt-toggle">
+      <button data-fmt="css" class="active">CSS</button>
+      <button data-fmt="tw">TAILWIND</button>
+    </div>
+  </div>
+
+  <div id="body">
+    <div id="sidebar">
+      <button class="module-btn active" data-m="radius"><span class="icon">◱</span>Border Radius<span class="led"></span></button>
+      <button class="module-btn" data-m="shadow"><span class="icon">▨</span>Box Shadow<span class="led"></span></button>
+      <button class="module-btn" data-m="gradient"><span class="icon">◐</span>Gradient<span class="led"></span></button>
+      <button class="module-btn" data-m="button"><span class="icon">▭</span>Button<span class="led"></span></button>
+      <button class="module-btn" data-m="glass"><span class="icon">◇</span>Glassmorphism<span class="led"></span></button>
+      <button class="module-btn" data-m="flex"><span class="icon">▤</span>Flexbox<span class="led"></span></button>
+      <button class="module-btn" data-m="transform"><span class="icon">↻</span>Transform<span class="led"></span></button>
+    </div>
+
+    <div id="main">
+      <div id="workzone">
+        <div id="stage">
+          <div id="stage-label">PREVIEW</div>
+          <div id="stage-inner"></div>
+        </div>
+        <div id="controls"></div>
+      </div>
+
+      <div id="output">
+        <div id="code-wrap"><pre id="code"></pre></div>
+        <div id="output-side">
+          <div id="meter">
+            <span class="on"></span><span class="on"></span><span></span><span class="on"></span><span></span>
+          </div>
+          <button id="copy-btn">Copy Code</button>
+          <button id="share-btn">🔗 Share Link</button>
+          <div id="share-hint">設定を含むURLをコピー</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const stageInner = document.getElementById('stage-inner');
+const controlsEl = document.getElementById('controls');
+const codeEl = document.getElementById('code');
+const copyBtn = document.getElementById('copy-btn');
+
+let format = 'css'; // css | tw
+let activeModule = 'radius';
+
+// ---------- state ----------
+const state = {
+  radius:{ linked:true, uniform:24, tl:24, tr:24, br:24, bl:24 },
+  shadow:{ x:0, y:8, blur:20, spread:0, color:'#000000', opacity:25, inset:false },
+  gradient:{ type:'linear', angle:90, c1:'#2196f3', c2:'#673ab7', c3:'', use3:false },
+  button:{ text:'Hello', bg:'#8b8fff', fg:'#14161c', px:22, py:11, radius:10, bw:0, bc:'#000000', hover:'#6f73f0' },
+  glass:{ bg:'#ffffff', opacity:16, blur:14, borderOp:25, shadow:true },
+  flex:{ direction:'row', justify:'center', align:'center', gap:12, wrap:false },
+  transform:{ rotate:0, scale:1, skew:0, tx:0, ty:0 }
+};
+
+function hexToRgb(hex){
+  const h = hex.replace('#','');
+  const bigint = parseInt(h.length===3 ? h.split('').map(c=>c+c).join('') : h, 16);
+  return { r:(bigint>>16)&255, g:(bigint>>8)&255, b:bigint&255 };
+}
+function rgba(hex, opacityPct){
+  const {r,g,b} = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${(opacityPct/100).toFixed(2)})`;
+}
+
+function esc(v){ return v; }
+
+// ---------- share via URL ----------
+function b64encode(str){
+  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64decode(str){
+  str = str.replace(/-/g,'+').replace(/_/g,'/');
+  while(str.length % 4) str += '=';
+  return decodeURIComponent(escape(atob(str)));
+}
+function encodeShareState(){
+  return b64encode(JSON.stringify({ v:1, state, activeModule, format }));
+}
+function updateHash(){
+  const encoded = encodeShareState();
+  history.replaceState(null, '', '#s=' + encoded);
+}
+function loadFromHash(){
+  const hash = location.hash;
+  const match = hash.match(/#s=([^&]+)/);
+  if(!match) return false;
+  try{
+    const data = JSON.parse(b64decode(match[1]));
+    if(data && data.state){
+      Object.keys(data.state).forEach(k=>{
+        if(state[k]) Object.assign(state[k], data.state[k]);
+      });
+      if(data.activeModule && modules[data.activeModule]) activeModule = data.activeModule;
+      if(data.format) format = data.format;
+      return true;
+    }
+  }catch(e){ console.warn('Share link could not be read:', e); }
+  return false;
+}
+
+function highlight(css){
+  // very light-touch syntax coloring for the CSS/Tailwind readout
+  return css
+    .replace(/([.\w:-]+)(\s*\{)/g, '<span class="tok-sel">$1</span>$2')
+    .replace(/([a-zA-Z-]+)(\s*:)/g, '<span class="tok-prop">$1</span>$2')
+    .replace(/(:\s*)([^;{}\n]+)(;)/g, '$1<span class="tok-val">$2</span><span class="tok-punc">$3</span>')
+    .replace(/([{}])/g, '<span class="tok-punc">$1</span>');
+}
+
+// ---------- per-module render ----------
+const modules = {
+
+radius:{
+  label:'Border Radius',
+  controls(){
+    const s = state.radius;
+    controlsEl.innerHTML = `
+      <div class="section-title">Corners</div>
+      <div class="seg" style="margin-bottom:14px;">
+        <button data-k="linked" class="${s.linked?'active':''}">Linked</button>
+        <button data-k="indiv" class="${!s.linked?'active':''}">Individual</button>
+      </div>
+      ${ s.linked ? `
+      <div class="field"><label>All corners <span class="val">${s.uniform}px</span></label>
+        <input type="range" min="0" max="100" value="${s.uniform}" data-b="uniform"></div>
+      ` : `
+      <div class="row2"><div class="field"><label>Top-left <span class="val">${s.tl}</span></label><input type="range" min="0" max="100" value="${s.tl}" data-b="tl"></div>
+      <div class="field"><label>Top-right <span class="val">${s.tr}</span></label><input type="range" min="0" max="100" value="${s.tr}" data-b="tr"></div></div>
+      <div class="row2"><div class="field"><label>Bottom-left <span class="val">${s.bl}</span></label><input type="range" min="0" max="100" value="${s.bl}" data-b="bl"></div>
+      <div class="field"><label>Bottom-right <span class="val">${s.br}</span></label><input type="range" min="0" max="100" value="${s.br}" data-b="br"></div></div>
+      `}
+    `;
+    controlsEl.querySelectorAll('[data-b]').forEach(el=>el.addEventListener('input',e=>{
+      s[e.target.dataset.b] = +e.target.value; render();
+    }));
+    controlsEl.querySelectorAll('.seg button').forEach(el=>el.addEventListener('click',e=>{
+      s.linked = e.target.dataset.k === 'linked'; render();
+    }));
+  },
+  preview(){
+    const s = state.radius;
+    const br = s.linked ? `${s.uniform}px` : `${s.tl}px ${s.tr}px ${s.br}px ${s.bl}px`;
+    stageInner.innerHTML = `<div class="pv-box" style="border-radius:${br};"></div>`;
+  },
+  code(fmt){
+    const s = state.radius;
+    if(fmt==='css'){
+      return s.linked
+        ? `.element {\n  border-radius: ${s.uniform}px;\n}`
+        : `.element {\n  border-radius: ${s.tl}px ${s.tr}px ${s.br}px ${s.bl}px;\n}`;
+    }
+    return s.linked
+      ? `<div class="rounded-[${s.uniform}px]"></div>`
+      : `<div class="rounded-tl-[${s.tl}px] rounded-tr-[${s.tr}px] rounded-br-[${s.br}px] rounded-bl-[${s.bl}px]"></div>`;
+  }
+},
+
+shadow:{
+  label:'Box Shadow',
+  controls(){
+    const s = state.shadow;
+    controlsEl.innerHTML = `
+      <div class="section-title">Offset & Blur</div>
+      <div class="field"><label>X <span class="val">${s.x}px</span></label><input type="range" min="-50" max="50" value="${s.x}" data-b="x"></div>
+      <div class="field"><label>Y <span class="val">${s.y}px</span></label><input type="range" min="-50" max="50" value="${s.y}" data-b="y"></div>
+      <div class="field"><label>Blur <span class="val">${s.blur}px</span></label><input type="range" min="0" max="100" value="${s.blur}" data-b="blur"></div>
+      <div class="field"><label>Spread <span class="val">${s.spread}px</span></label><input type="range" min="-20" max="50" value="${s.spread}" data-b="spread"></div>
+      <div class="field"><label>Opacity <span class="val">${s.opacity}%</span></label><input type="range" min="0" max="100" value="${s.opacity}" data-b="opacity"></div>
+      <div class="swatch-row" style="margin-bottom:12px;"><input type="color" value="${s.color}" data-c="color"><span>Shadow color</span></div>
+      <div class="check-row"><input type="checkbox" ${s.inset?'checked':''} data-chk="inset" id="inset-chk"><label for="inset-chk">Inset shadow</label></div>
+    `;
+    controlsEl.querySelectorAll('[data-b]').forEach(el=>el.addEventListener('input',e=>{ s[e.target.dataset.b]=+e.target.value; render(); }));
+    controlsEl.querySelectorAll('[data-c]').forEach(el=>el.addEventListener('input',e=>{ s[e.target.dataset.c]=e.target.value; render(); }));
+    controlsEl.querySelectorAll('[data-chk]').forEach(el=>el.addEventListener('change',e=>{ s[e.target.dataset.chk]=e.target.checked; render(); }));
+  },
+  preview(){
+    const s = state.shadow;
+    const shadow = `${s.inset?'inset ':''}${s.x}px ${s.y}px ${s.blur}px ${s.spread}px ${rgba(s.color,s.opacity)}`;
+    stageInner.innerHTML = `<div class="pv-box" style="border-radius:14px;box-shadow:${shadow};"></div>`;
+  },
+  code(fmt){
+    const s = state.shadow;
+    const shadowVal = `${s.inset?'inset ':''}${s.x}px ${s.y}px ${s.blur}px ${s.spread}px ${rgba(s.color,s.opacity)}`;
+    if(fmt==='css') return `.element {\n  box-shadow: ${shadowVal};\n}`;
+    const twVal = shadowVal.replace(/ /g,'_');
+    return `<div class="shadow-[${twVal}]"></div>`;
+  }
+},
+
+gradient:{
+  label:'Gradient',
+  controls(){
+    const s = state.gradient;
+    controlsEl.innerHTML = `
+      <div class="section-title">Type</div>
+      <div class="seg" style="margin-bottom:14px;">
+        <button data-k="linear" class="${s.type==='linear'?'active':''}">Linear</button>
+        <button data-k="radial" class="${s.type==='radial'?'active':''}">Radial</button>
+      </div>
+      ${ s.type==='linear' ? `<div class="field"><label>Angle <span class="val">${s.angle}°</span></label><input type="range" min="0" max="360" value="${s.angle}" data-b="angle"></div>` : ''}
+      <div class="section-title">Colors</div>
+      <div class="swatch-row" style="margin-bottom:10px;"><input type="color" value="${s.c1}" data-c="c1"><span>Color 1</span></div>
+      <div class="swatch-row" style="margin-bottom:10px;"><input type="color" value="${s.c2}" data-c="c2"><span>Color 2</span></div>
+      <div class="check-row"><input type="checkbox" ${s.use3?'checked':''} data-chk="use3" id="c3-chk"><label for="c3-chk">Add third color</label></div>
+      ${ s.use3 ? `<div class="swatch-row" style="margin-bottom:10px;"><input type="color" value="${s.c3||'#ff4d8b'}" data-c="c3"><span>Color 3</span></div>` : ''}
+    `;
+    controlsEl.querySelectorAll('[data-b]').forEach(el=>el.addEventListener('input',e=>{ s[e.target.dataset.b]=+e.target.value; render(); }));
+    controlsEl.querySelectorAll('[data-c]').forEach(el=>el.addEventListener('input',e=>{ s[e.target.dataset.c]=e.target.value; render(); }));
+    controlsEl.querySelectorAll('.seg button').forEach(el=>el.addEventListener('click',e=>{ s.type=e.target.dataset.k; render(); }));
+    controlsEl.querySelectorAll('[data-chk]').forEach(el=>el.addEventListener('change',e=>{ s.use3=e.target.checked; if(s.use3 && !s.c3) s.c3='#ff4d8b'; render(); }));
+  },
+  gradString(){
+    const s = state.gradient;
+    const stops = [s.c1, s.c2, ...(s.use3 && s.c3 ? [s.c3] : [])].join(', ');
+    return s.type==='linear' ? `linear-gradient(${s.angle}deg, ${stops})` : `radial-gradient(circle, ${stops})`;
+  },
+  preview(){
+    stageInner.innerHTML = `<div class="pv-box" style="border-radius:14px;background:${this.gradString()};"></div>`;
+  },
+  code(fmt){
+    const g = this.gradString();
+    if(fmt==='css') return `.element {\n  background: ${g};\n}`;
+    return `<div class="bg-[${g.replace(/ /g,'_')}]"></div>`;
+  }
+},
+
+button:{
+  label:'Button',
+  controls(){
+    const s = state.button;
+    controlsEl.innerHTML = `
+      <div class="field"><label>Label</label><input type="text" value="${s.text}" data-t="text" style="width:100%;background:var(--panel-raised);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:12.5px;"></div>
+      <div class="row2">
+        <div class="swatch-row"><input type="color" value="${s.bg}" data-c="bg"><span>Fill</span></div>
+        <div class="swatch-row"><input type="color" value="${s.fg}" data-c="fg"><span>Text</span></div>
+      </div>
+      <div class="row2" style="margin-top:12px;">
+        <div class="swatch-row"><input type="color" value="${s.hover}" data-c="hover"><span>Hover</span></div>
+        <div class="swatch-row"><input type="color" value="${s.bc}" data-c="bc"><span>Border</span></div>
+      </div>
+      <div class="field" style="margin-top:14px;"><label>Padding X <span class="val">${s.px}px</span></label><input type="range" min="0" max="60" value="${s.px}" data-b="px"></div>
+      <div class="field"><label>Padding Y <span class="val">${s.py}px</span></label><input type="range" min="0" max="30" value="${s.py}" data-b="py"></div>
+      <div class="field"><label>Radius <span class="val">${s.radius}px</span></label><input type="range" min="0" max="40" value="${s.radius}" data-b="radius"></div>
+      <div class="field"><label>Border width <span class="val">${s.bw}px</span></label><input type="range" min="0" max="8" value="${s.bw}" data-b="bw"></div>
+    `;
+    controlsEl.querySelector('[data-t="text"]').addEventListener('input',e=>{ s.text=e.target.value; render(); });
+    controlsEl.querySelectorAll('[data-b]').forEach(el=>el.addEventListener('input',e=>{ s[e.target.dataset.b]=+e.target.value; render(); }));
+    controlsEl.querySelectorAll('[data-c]').forEach(el=>el.addEventListener('input',e=>{ s[e.target.dataset.c]=e.target.value; render(); }));
+  },
+  preview(){
+    const s = state.button;
+    stageInner.innerHTML = `<button class="pv-btn" id="pv-real-btn" style="background:${s.bg};color:${s.fg};padding:${s.py}px ${s.px}px;border-radius:${s.radius}px;border:${s.bw}px solid ${s.bc};">${s.text||'Button'}</button>`;
+    const b = document.getElementById('pv-real-btn');
+    b.addEventListener('mouseenter',()=>b.style.background=s.hover);
+    b.addEventListener('mouseleave',()=>b.style.background=s.bg);
+  },
+  code(fmt){
+    const s = state.button;
+    if(fmt==='css') return `<button class="btn">${s.text||'Button'}</button>\n\n.btn {\n  background: ${s.bg};\n  color: ${s.fg};\n  padding: ${s.py}px ${s.px}px;\n  border-radius: ${s.radius}px;\n  border: ${s.bw}px solid ${s.bc};\n  cursor: pointer;\n  transition: background .2s ease;\n}\n.btn:hover {\n  background: ${s.hover};\n}`;
+    return `<button class="bg-[${s.bg}] text-[${s.fg}] px-[${s.px}px] py-[${s.py}px] rounded-[${s.radius}px] border-[${s.bw}px] border-[${s.bc}] hover:bg-[${s.hover}] transition-colors">\n  ${s.text||'Button'}\n</button>`;
+  }
+},
+
+glass:{
+  label:'Glassmorphism',
+  controls(){
+    const s = state.glass;
+    controlsEl.innerHTML = `
+      <div class="swatch-row" style="margin-bottom:12px;"><input type="color" value="${s.bg}" data-c="bg"><span>Panel color</span></div>
+      <div class="field"><label>Fill opacity <span class="val">${s.opacity}%</span></label><input type="range" min="0" max="60" value="${s.opacity}" data-b="opacity"></div>
+      <div class="field"><label>Blur <span class="val">${s.blur}px</span></label><input type="range" min="0" max="40" value="${s.blur}" data-b="blur"></div>
+      <div class="field"><label>Border opacity <span class="val">${s.borderOp}%</span></label><input type="range" min="0" max="100" value="${s.borderOp}" data-b="borderOp"></div>
+      <div class="check-row"><input type="checkbox" ${s.shadow?'checked':''} data-chk="shadow" id="glass-shadow"><label for="glass-shadow">Drop shadow</label></div>
+    `;
+    controlsEl.querySelectorAll('[data-b]').forEach(el=>el.addEventListener('input',e=>{ s[e.target.dataset.b]=+e.target.value; render(); }));
+    controlsEl.querySelectorAll('[data-c]').forEach(el=>el.addEventListener('input',e=>{ s[e.target.dataset.c]=e.target.value; render(); }));
+    controlsEl.querySelectorAll('[data-chk]').forEach(el=>el.addEventListener('change',e=>{ s[e.target.dataset.chk]=e.target.checked; render(); }));
+  },
+  preview(){
+    const s = state.glass;
+    const shadow = s.shadow ? '0 8px 32px rgba(0,0,0,.25)' : 'none';
+    stageInner.innerHTML = `<div class="glass-backdrop"><div style="width:74%;height:66%;border-radius:14px;background:${rgba(s.bg,s.opacity)};backdrop-filter:blur(${s.blur}px);-webkit-backdrop-filter:blur(${s.blur}px);border:1px solid ${rgba('#ffffff',s.borderOp)};box-shadow:${shadow};"></div></div>`;
+  },
+  code(fmt){
+    const s = state.glass;
+    const shadow = s.shadow ? '\n  box-shadow: 0 8px 32px rgba(0, 0, 0, .25);' : '';
+    if(fmt==='css') return `.glass {\n  background: ${rgba(s.bg,s.opacity)};\n  backdrop-filter: blur(${s.blur}px);\n  -webkit-backdrop-filter: blur(${s.blur}px);\n  border: 1px solid ${rgba('#ffffff',s.borderOp)};${shadow}\n}`;
+    const shadowTw = s.shadow ? ' shadow-[0_8px_32px_rgba(0,0,0,.25)]' : '';
+    return `<div class="bg-[${rgba(s.bg,s.opacity).replace(/ /g,'_')}] backdrop-blur-[${s.blur}px] border border-[${rgba('#ffffff',s.borderOp).replace(/ /g,'_')}]${shadowTw}"></div>`;
+  }
+},
+
+flex:{
+  label:'Flexbox',
+  controls(){
+    const s = state.flex;
+    const dirs=['row','row-reverse','column','column-reverse'];
+    const justs=['flex-start','center','flex-end','space-between','space-around'];
+    const aligns=['flex-start','center','flex-end','stretch'];
+    const sel=(opts,cur)=>opts.map(o=>`<option value="${o}" ${o===cur?'selected':''}>${o}</option>`).join('');
+    controlsEl.innerHTML = `
+      <div class="field"><label>Direction</label><select data-s="direction" style="width:100%;">${sel(dirs,s.direction)}</select></div>
+      <div class="field"><label>Justify content</label><select data-s="justify" style="width:100%;">${sel(justs,s.justify)}</select></div>
+      <div class="field"><label>Align items</label><select data-s="align" style="width:100%;">${sel(aligns,s.align)}</select></div>
+      <div class="field"><label>Gap <span class="val">${s.gap}px</span></label><input type="range" min="0" max="40" value="${s.gap}" data-b="gap"></div>
+      <div class="check-row"><input type="checkbox" ${s.wrap?'checked':''} data-chk="wrap" id="flex-wrap"><label for="flex-wrap">Wrap</label></div>
+    `;
+    controlsEl.querySelectorAll('select').forEach(el=>el.addEventListener('change',e=>{ s[e.target.dataset.s]=e.target.value; render(); }));
+    controlsEl.querySelectorAll('[data-b]').forEach(el=>el.addEventListener('input',e=>{ s[e.target.dataset.b]=+e.target.value; render(); }));
+    controlsEl.querySelectorAll('[data-chk]').forEach(el=>el.addEventListener('change',e=>{ s[e.target.dataset.chk]=e.target.checked; render(); }));
+  },
+  preview(){
+    const s = state.flex;
+    const chips = [1,2,3].map(n=>`<div class="chip">${n}</div>`).join('');
+    stageInner.innerHTML = `<div class="flex-demo" style="flex-direction:${s.direction};justify-content:${s.justify};align-items:${s.align};gap:${s.gap}px;flex-wrap:${s.wrap?'wrap':'nowrap'};">${chips}</div>`;
+  },
+  code(fmt){
+    const s = state.flex;
+    if(fmt==='css') return `.container {\n  display: flex;\n  flex-direction: ${s.direction};\n  justify-content: ${s.justify};\n  align-items: ${s.align};\n  gap: ${s.gap}px;${s.wrap?'\n  flex-wrap: wrap;':''}\n}`;
+    const map = {'flex-start':'start','flex-end':'end','center':'center','space-between':'between','space-around':'around','stretch':'stretch'};
+    const dirTw = {row:'flex-row',['row-reverse']:'flex-row-reverse',column:'flex-col',['column-reverse']:'flex-col-reverse'}[s.direction];
+    return `<div class="flex ${dirTw} justify-${map[s.justify]} items-${map[s.align]} gap-[${s.gap}px]${s.wrap?' flex-wrap':''}">\n  ...\n</div>`;
+  }
+},
+
+transform:{
+  label:'Transform',
+  controls(){
+    const s = state.transform;
+    controlsEl.innerHTML = `
+      <div class="field"><label>Rotate <span class="val">${s.rotate}°</span></label><input type="range" min="-180" max="180" value="${s.rotate}" data-b="rotate"></div>
+      <div class="field"><label>Scale <span class="val">${s.scale}</span></label><input type="range" min="50" max="200" value="${Math.round(s.scale*100)}" data-b="scalepct"></div>
+      <div class="field"><label>Skew <span class="val">${s.skew}°</span></label><input type="range" min="-45" max="45" value="${s.skew}" data-b="skew"></div>
+      <div class="field"><label>Translate X <span class="val">${s.tx}px</span></label><input type="range" min="-100" max="100" value="${s.tx}" data-b="tx"></div>
+      <div class="field"><label>Translate Y <span class="val">${s.ty}px</span></label><input type="range" min="-100" max="100" value="${s.ty}" data-b="ty"></div>
+    `;
+    controlsEl.querySelectorAll('[data-b]').forEach(el=>el.addEventListener('input',e=>{
+      const k = e.target.dataset.b;
+      if(k==='scalepct'){ s.scale = (+e.target.value/100); } else { s[k]=+e.target.value; }
+      render();
+    }));
+  },
+  transformString(){
+    const s = state.transform;
+    return `rotate(${s.rotate}deg) scale(${s.scale}) skew(${s.skew}deg) translate(${s.tx}px, ${s.ty}px)`;
+  },
+  preview(){
+    stageInner.innerHTML = `<div class="transform-target" style="transform:${this.transformString()};"></div>`;
+  },
+  code(fmt){
+    const t = this.transformString();
+    if(fmt==='css') return `.element {\n  transform: ${t};\n}`;
+    return `<div class="transform-[${t.replace(/ /g,'_')}]"></div>`;
+  }
+}
+
+};
+
+// ---------- wiring ----------
+function render(){
+  const m = modules[activeModule];
+  m.preview();
+  m.controls();
+  const raw = m.code(format);
+  codeEl.innerHTML = highlight(raw);
+  updateHash();
+}
+
+function syncTopUI(){
+  document.querySelectorAll('.module-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.m === activeModule);
+  });
+  document.querySelectorAll('#fmt-toggle button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.fmt === format);
+  });
+}
+
+document.querySelectorAll('.module-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.module-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    activeModule = btn.dataset.m;
+    render();
+  });
+});
+
+document.querySelectorAll('#fmt-toggle button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('#fmt-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    format = btn.dataset.fmt;
+    render();
+  });
+});
+
+copyBtn.addEventListener('click',()=>{
+  const text = codeEl.innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    copyBtn.textContent = 'Copied ✓';
+    copyBtn.classList.add('copied');
+    setTimeout(()=>{ copyBtn.textContent='Copy Code'; copyBtn.classList.remove('copied'); }, 1400);
+  });
+});
+
+const shareBtn = document.getElementById('share-btn');
+shareBtn.addEventListener('click',()=>{
+  updateHash();
+  const url = location.href;
+  navigator.clipboard.writeText(url).then(()=>{
+    shareBtn.textContent = 'コピーしました ✓';
+    shareBtn.classList.add('copied');
+    setTimeout(()=>{ shareBtn.textContent='🔗 Share Link'; shareBtn.classList.remove('copied'); }, 1600);
+  }).catch(()=>{
+    // clipboard API unavailable (e.g. non-secure context) — fall back to selecting the hash for manual copy
+    shareBtn.textContent = 'URLをコピーできません';
+    setTimeout(()=>{ shareBtn.textContent='🔗 Share Link'; }, 1600);
+  });
+});
+
+// restore a shared configuration from the URL, if present, then draw everything
+const loadedFromLink = loadFromHash();
+syncTopUI();
+render();
+if(loadedFromLink){
+  copyBtn.insertAdjacentHTML('beforebegin', '<div id="restore-note" style="font-size:9.5px;color:var(--amber);text-align:center;font-family:\'JetBrains Mono\',monospace;margin-bottom:2px;">共有された設定を読み込みました</div>');
+}
+</script>
+</body>
+</html>
